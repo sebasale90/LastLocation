@@ -1,0 +1,37 @@
+name: LastLocation
+version: 1.0-SNAPSHOT
+main: org.location.lastLocation.LastLocation
+api-version: 1.20  # Asegúrate de poner una versión válida aquí
+description: Plugin para guardar la ubicación de los jugadores al salir de un mundo.
+author: Serresto
+
+permissions:
+  lastlocation.admin:
+    description: Permiso de administrador para editar mensajes y configuraciones
+    default: op
+
+commands:
+  agregar_mundo_lista_negra:
+    description: Agrega un mundo a la lista negra para evitar el teletransporte.
+    usage: /<command> <nombre_del_mundo>
+    permission: lastlocation.admin
+    tab-completer: org.location.lastLocation.CommandTabCompleter
+
+  quitar_mundo_lista_negra:
+    description: Elimina un mundo de la lista negra para permitir el teletransporte.
+    usage: /<command> <nombre_del_mundo>
+    permission: lastlocation.admin
+    tab-completer: org.location.lastLocation.CommandTabCompleter
+
+  ver_lista_negra:
+    description: Muestra los mundos en la lista negra.
+    usage: /<command>
+    permission: lastlocation.admin
+    tab-completer: org.location.lastLocation.CommandTabCompleter
+
+  modificar_mensajes:
+    description: Modifica los mensajes del plugin.
+    usage: /<command> <tipo> <nuevo_mensaje>
+    permission: lastlocation.admin
+    tab-completer: org.location.lastLocation.CommandTabCompleter
+
