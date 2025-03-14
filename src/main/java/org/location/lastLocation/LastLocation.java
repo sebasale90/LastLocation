@@ -2,7 +2,6 @@ package org.location.lastLocation;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -11,160 +10,163 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.location.lastLocation.SQLite;  // Importación de la clase SQLite
+import org.bukkit.command.CommandExecutor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.Arrays;
 
-public class LastLocation extends JavaPlugin implements Listener {
+public class LastLocation extends JavaPlugin implements Listener, CommandExecutor {
     private SQLite sqlite;
 
     @Override
     public void onEnable() {
-        // Crear una nueva instancia de SQLite y conectar a la base de datos
         sqlite = new SQLite(this);
         sqlite.connectToDatabase();
-
-        // Cargar la configuración por defecto
         saveDefaultConfig();
-
-        // Registrar eventos
         Bukkit.getPluginManager().registerEvents(this, this);
-
-        // Registrar el TabCompleter para los comandos
-        getCommand("agregar mundo a lista negra").setTabCompleter(new CommandTabCompleter());
-        getCommand("quitar mundo de lista negra").setTabCompleter(new CommandTabCompleter());
-        getCommand("ver lista negra").setTabCompleter(new CommandTabCompleter());
-        getCommand("modificar mensajes").setTabCompleter(new CommandTabCompleter());
+        registerCommand("agregar_mundo_lista_negra");
+        registerCommand("quitar_mundo_lista_negra");
+        registerCommand("ver_lista_negra");
+        registerCommand("modificar_mensajes");
     }
 
     @Override
     public void onDisable() {
-        // Cerrar la conexión a la base de datos cuando el plugin se desactiva
         sqlite.closeConnection();
     }
 
-    // Guardar la ubicación cuando el jugador se desconecta
+    private void registerCommand(String command) {
+        if (getCommand(command) != null) {
+            org.bukkit.command.PluginCommand cmd = getCommand(command);
+            if (cmd != null) {
+                cmd.setExecutor(this);
+                cmd.setTabCompleter(new CommandTabCompleter(this));
+                getLogger().info("Comando '" + command + "' registrado exitosamente.");
+            }
+        } else {
+            getLogger().warning("El comando '" + command + "' no está registrado en plugin.yml");
+        }
+    }
+
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        Player player = event.getPlayer();
-        savePlayerLocation(player);
+        savePlayerLocation(event.getPlayer());
     }
 
-    // Teletransportar al jugador a su última ubicación cuando ingresa al mundo
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        teleportToLastLocation(player);
+        teleportToLastLocation(event.getPlayer());
     }
 
-    public void savePlayerLocation(Player player) {
-        World world = player.getWorld();
-        String worldName = world.getName();
-
-        // Verificar si el mundo está en la lista negra
-        if (isWorldBlacklisted(worldName)) {
-            return;
-        }
-
-        // Obtener la ubicación y guardarla en la base de datos
-        Location location = player.getLocation();
-        sqlite.saveLocation(player.getUniqueId().toString(), worldName, location);
-    }
-
-    public void teleportToLastLocation(Player player) {
+    private void savePlayerLocation(Player player) {
         String worldName = player.getWorld().getName();
+        if (!isWorldBlacklisted(worldName)) {
+            sqlite.saveLocation(player.getUniqueId().toString(), worldName, player.getLocation());
+        }
+    }
 
-        // Verificar si el mundo está en la lista negra
+    private void teleportToLastLocation(Player player) {
+        String worldName = player.getWorld().getName();
         if (isWorldBlacklisted(worldName)) {
+            player.sendMessage(getConfig().getString("messages.world_blacklisted", "Este mundo está en la lista negra, no se puede teletransportar."));
             return;
         }
 
-        // Obtener la última ubicación desde la base de datos
         Location lastLocation = sqlite.getLastLocation(player.getUniqueId().toString(), worldName);
         if (lastLocation != null) {
             player.teleport(lastLocation);
+            player.sendMessage(getConfig().getString("messages.teleportacion", "¡Te hemos teletransportado a tu última ubicación!"));
+        } else {
+            player.sendMessage(getConfig().getString("messages.no_last_location", "No se ha guardado ninguna ubicación para ti en este mundo."));
         }
     }
 
-    // Verificar si el mundo está en la lista negra
     private boolean isWorldBlacklisted(String worldName) {
-        List<String> blacklistedWorlds = getConfig().getStringList("worlds-blacklist");
-        return blacklistedWorlds.contains(worldName);
+        return getConfig().getStringList("worlds-blacklist").contains(worldName);
     }
 
-    // Comandos para agregar, quitar y ver mundos en la lista negra, y modificar mensajes
     @Override
-    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        if (cmd.getName().equalsIgnoreCase("agregar mundo a lista negra") && sender.hasPermission("lastlocation.admin")) {
-            if (args.length == 1) {
-                String worldName = args[0];
-                List<String> blacklistedWorlds = getConfig().getStringList("worlds-blacklist");
-
-                if (!blacklistedWorlds.contains(worldName)) {
-                    blacklistedWorlds.add(worldName);
-                    getConfig().set("worlds-blacklist", blacklistedWorlds);
-                    saveConfig();
-                    sender.sendMessage("§aMundo '" + worldName + "' ha sido añadido a la lista negra.");
-                } else {
-                    sender.sendMessage("§cEl mundo '" + worldName + "' ya está en la lista negra.");
-                }
-            } else {
-                sender.sendMessage("§cUso incorrecto del comando. Usa: /agregar mundo a lista negra <world_name>");
-            }
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command cmd, @NotNull String label, @NotNull String[] args) {
+        if (!sender.hasPermission("lastlocation.admin")) {
+            sender.sendMessage("§cNo tienes permiso para ejecutar este comando.");
             return true;
         }
 
-        if (cmd.getName().equalsIgnoreCase("quitar mundo de lista negra") && sender.hasPermission("lastlocation.admin")) {
-            if (args.length == 1) {
-                String worldName = args[0];
-                List<String> blacklistedWorlds = getConfig().getStringList("worlds-blacklist");
+        switch (cmd.getName().toLowerCase()) {
+            case "agregar_mundo_lista_negra":
+                return handleBlacklistCommand(sender, args, true);
+            case "quitar_mundo_lista_negra":
+                return handleBlacklistCommand(sender, args, false);
+            case "ver_lista_negra":
+                return handleViewBlacklistCommand(sender);
+            case "modificar_mensajes":
+                handleModifyMessagesCommand(sender, args);
+                return true;
+            default:
+                return false;
+        }
+    }
 
-                if (blacklistedWorlds.contains(worldName)) {
-                    blacklistedWorlds.remove(worldName);
-                    getConfig().set("worlds-blacklist", blacklistedWorlds);
-                    saveConfig();
-                    sender.sendMessage("§aMundo '" + worldName + "' ha sido eliminado de la lista negra.");
-                } else {
-                    sender.sendMessage("§cEl mundo '" + worldName + "' no está en la lista negra.");
-                }
-            } else {
-                sender.sendMessage("§cUso incorrecto del comando. Usa: /quitar mundo de lista negra <world_name>");
-            }
-            return true;
+    private boolean handleBlacklistCommand(@NotNull CommandSender sender, @NotNull String[] args, boolean add) {
+        if (args.length != 1) {
+            sender.sendMessage("§cUso: /" + (add ? "agregar_mundo_lista_negra" : "quitar_mundo_lista_negra") + " <nombre_mundo>");
+            return false;
         }
 
-        if (cmd.getName().equalsIgnoreCase("ver lista negra") && sender.hasPermission("lastlocation.admin")) {
-            List<String> blacklistedWorlds = getConfig().getStringList("worlds-blacklist");
+        List<String> blacklistedWorlds = getConfig().getStringList("worlds-blacklist");
+        String worldName = args[0];
 
-            if (blacklistedWorlds.isEmpty()) {
-                sender.sendMessage("§cNo hay mundos en la lista negra.");
-            } else {
-                sender.sendMessage("§aMundos en la lista negra:");
-                for (String world : blacklistedWorlds) {
-                    sender.sendMessage("§7- " + world);
-                }
+        if (add) {
+            if (blacklistedWorlds.contains(worldName)) {
+                sender.sendMessage("§cEl mundo '" + worldName + "' ya está en la lista negra.");
+                return true;
             }
-            return true;
+            blacklistedWorlds.add(worldName);
+            sender.sendMessage("§aMundo '" + worldName + "' añadido a la lista negra.");
+        } else {
+            if (!blacklistedWorlds.remove(worldName)) {
+                sender.sendMessage("§cEl mundo '" + worldName + "' no está en la lista negra.");
+                return true;
+            }
+            sender.sendMessage("§aMundo '" + worldName + "' eliminado de la lista negra.");
         }
 
-        if (cmd.getName().equalsIgnoreCase("modificar mensajes") && sender.hasPermission("lastlocation.admin")) {
-            if (args.length == 2) {
-                String messageType = args[0];
-                String newMessage = args[1];
+        getConfig().set("worlds-blacklist", blacklistedWorlds);
+        saveConfig();
+        return true;
+    }
 
-                if (messageType.equalsIgnoreCase("teleportacion")) {
-                    getConfig().set("messages.teleportation", newMessage);
-                    saveConfig();
-                    sender.sendMessage("§aMensaje de teleportación modificado exitosamente.");
-                } else {
-                    sender.sendMessage("§cTipo de mensaje desconocido. Usa 'teleportacion'.");
-                }
-            } else {
-                sender.sendMessage("§cUso incorrecto del comando. Usa: /modificar mensajes <tipo> <nuevo_mensaje>");
+    private boolean handleViewBlacklistCommand(@NotNull CommandSender sender) {
+        List<String> blacklistedWorlds = getConfig().getStringList("worlds-blacklist");
+
+        if (blacklistedWorlds.isEmpty()) {
+            sender.sendMessage("§cNo hay mundos en la lista negra.");
+        } else {
+            sender.sendMessage("§aMundos en la lista negra:");
+            for (String world : blacklistedWorlds) {
+                sender.sendMessage("§7- " + world);
             }
-            return true;
+        }
+        return true;
+    }
+
+    private void handleModifyMessagesCommand(@NotNull CommandSender sender, @NotNull String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§cUso: /modificar_mensajes <tipo> <nuevo_mensaje>");
+            return;
         }
 
-        return false;
+        String messageType = args[0];
+        String newMessage = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+
+        if (!messageType.equalsIgnoreCase("teleportacion")) {
+            sender.sendMessage("§cTipo de mensaje desconocido. Usa 'teleportacion'.");
+            return;
+        }
+
+        getConfig().set("messages.teleportacion", newMessage);
+        saveConfig();
+        sender.sendMessage("§aMensaje de teleportación modificado.");
     }
 }

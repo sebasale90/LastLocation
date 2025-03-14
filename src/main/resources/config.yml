@@ -1,20 +1,18 @@
 # Configuración del plugin LastLocation
 
 # Lista de mundos en los que el plugin no hará teletransporte ni guardará ubicaciones.
-# Agrega los mundos que desees en esta lista.
 worlds-blacklist:
   - world_nether     # Mundo del Nether
   - world_the_end    # Mundo del End
-  # Añadir más mundos según sea necesario, como por ejemplo:
+  # Añadir más mundos según sea necesario, por ejemplo:
   # - mundo_de_prueba
 
 # Mensajes personalizables
 messages:
-  teleportation: "¡Te hemos teletransportado a tu última ubicación!"  # Mensaje que se muestra al teletransportar a un jugador
+  teleportacion: "¡Te hemos teletransportado a tu última ubicación!"  # Mensaje al teletransportar a un jugador
   no_last_location: "No se ha guardado ninguna ubicación para ti en este mundo."  # Mensaje si no hay ubicación guardada
-  world_blacklisted: "Este mundo está en la lista negra, no se puede teletransportar."  # Mensaje si el mundo está en la lista negra
+  world_blacklisted: "Este mundo está en la lista negra, no se puede teletransportar."  # Mensaje si el mundo está en lista negra
 
-# Otras configuraciones personalizables (si es necesario, puedes añadir más opciones en el futuro)
+# Otras configuraciones personalizables
 other-settings:
-  # Activar o desactivar características adicionales del plugin
-  enable-feature-x: true   # Cambiar a false para desactivar una característica
+  enable-feature-x: true   # Cambiar a false para desactivar alguna característica

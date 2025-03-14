@@ -1,13 +1,13 @@
 name: LastLocation
 version: 1.0-SNAPSHOT
 main: org.location.lastLocation.LastLocation
-api-version: 1.20  # Asegúrate de poner una versión válida aquí
+api-version: 1.21
 description: Plugin para guardar la ubicación de los jugadores al salir de un mundo.
 author: Serresto
 
 permissions:
   lastlocation.admin:
-    description: Permiso de administrador para editar mensajes y configuraciones
+    description: Permiso de administrador para editar mensajes y configuraciones.
     default: op
 
 commands:
@@ -34,4 +34,3 @@ commands:
     usage: /<command> <tipo> <nuevo_mensaje>
     permission: lastlocation.admin
     tab-completer: org.location.lastLocation.CommandTabCompleter
-
